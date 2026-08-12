@@ -1,8 +1,8 @@
-# Multi-GPU Cellpose-SAM Wrapper
+# Multi-GPU Cellpose/SAM Wrapper
 
 A drop-in replacement for the python executable that QuPath's [BIOP Cellpose
 extension](https://github.com/BIOP/qupath-extension-cellpose) calls, which
-fans tile-based Cellpose-SAM inference out across multiple GPUs (or multiple
+fans tile-based Cellpose/SAM inference out across multiple GPUs (or multiple
 concurrent processes on a single GPU, or across CPU cores with no GPU at
 all). Also usable completely standalone, outside QuPath, on any folder of
 images.
@@ -10,7 +10,7 @@ images.
 ## Why this exists
 
 QuPath's StarDist extension runs natively inside QuPath's own JVM, so it can
-multi-thread tile inference in-process. Cellpose-SAM doesn't run natively —
+multi-thread tile inference in-process. Cellpose/SAM doesn't run natively —
 the extension exports annotation tiles to a temp folder and shells out to a
 single external `python -m cellpose --dir <folder> ...` call, which loads the
 model once and then processes every tile in that folder **sequentially**.
@@ -49,7 +49,7 @@ nothing changed except it's faster.
 
 ## Requirements
 
-- A working Cellpose-SAM (`cpsam`) environment — this wrapper calls into
+- A working Cellpose/SAM environment — this wrapper calls into
   your existing install, it doesn't bundle one.
 - Windows (paths and the PyInstaller build step below assume this; the
   config-location fallback logic works on Linux/macOS too, but hasn't been
@@ -69,7 +69,7 @@ nothing changed except it's faster.
    most Cellpose preference fields want an actual `.exe`, not a bare `.py`).
 
 3. **Locate the preference field.** In recent versions this has been a
-   single field named something like *"Cellpose-SAM python.exe location"*
+   specific fields named something like *"Cellpose python.exe location" and "Cellpose-SAM python.exe location"*
    rather than a separate venv/conda environment picker. Point it at the
    built `.exe`.
 
@@ -81,7 +81,7 @@ nothing changed except it's faster.
 
 ### Multiple cellpose environments (e.g. cellpose-sam and plain cellpose)
 
-If you need two separate environments — say a `cpsam` environment for one
+If you need two separate environments — say a cellpose-sam environment for one
 QuPath detector and a classic-cellpose environment for another — build two
 differently-**named** exes from this same, unmodified source, e.g.:
 
