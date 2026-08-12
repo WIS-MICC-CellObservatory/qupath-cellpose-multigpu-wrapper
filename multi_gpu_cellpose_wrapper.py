@@ -15,7 +15,7 @@ them, then merges the mask outputs back into the original directory so
 the extension finds them exactly where it expects.
 
 ------------------------------------------------------------------
-CONFIG (shared .exe, per-workstation settings)
+CONFIG (shared .exe, per-workstation settings, per-environment configs)
 ------------------------------------------------------------------
 This script/exe is designed to be a single shared copy (e.g. on a
 network path every QuPath install points at) while each workstation
@@ -23,8 +23,8 @@ keeps its OWN settings (GPU count/ids, path to that machine's real
 python environment). Settings therefore do NOT live next to the exe
 by default -- they live in a per-machine location:
 
-    Windows:  %PROGRAMDATA%\CellposeWrapper\wrapper_config.json
-              (e.g. C:\ProgramData\CellposeWrapper\wrapper_config.json)
+    Windows:  %PROGRAMDATA%\CellposeWrapper\<exe-name>.config.json
+              (e.g. C:\ProgramData\CellposeWrapper\multi_gpu_cellpose_wrapper.config.json)
 
 PROGRAMDATA is deliberately used instead of LOCALAPPDATA: PROGRAMDATA
 is tied to the physical machine, whereas LOCALAPPDATA follows the
@@ -32,11 +32,24 @@ logged-in user profile and can roam across different workstations on
 networks using roaming profiles -- which would silently apply GPU
 settings from the wrong machine.
 
-On first run on a given workstation (with no existing config), this
-script creates a default file at that per-machine path and exits with
-a message -- edit real_python / gpu_ids there for that machine, then
-rerun. Every workstation ends up with its own file at the same fixed
-path, all pointing at the one shared .exe.
+MULTIPLE ENVIRONMENTS (e.g. a cellpose-sam build and a separate plain
+cellpose build): the config filename is derived automatically from the
+exe's own filename, so build two differently-named exes from this same
+unmodified source -- e.g. rename the built exe to
+"cellpose_wrapper_sam.exe" and "cellpose_wrapper_classic.exe" before
+deploying -- and each one automatically reads/writes its own config
+("cellpose_wrapper_sam.config.json" /
+"cellpose_wrapper_classic.config.json") in the same PROGRAMDATA folder
+without colliding. No source edits or separate builds-per-environment
+needed; just name the exe for what it points at and the right config
+file follows automatically. Point QuPath's Cellpose-SAM preference
+field at one exe and (if applicable) any other Cellpose preference
+field at the other.
+
+On first run for a given exe on a given workstation (no config yet for
+that exact exe name), this script writes a default file at that path
+and exits with a message -- edit real_python / gpu_ids there for that
+environment, then rerun.
 
 Override (optional, e.g. for testing multiple configs from one
 machine): set an environment variable CELLPOSE_WRAPPER_CONFIG_DIR to
@@ -174,6 +187,16 @@ def get_exe_dir():
     return Path(__file__).resolve().parent
 
 
+def get_exe_stem():
+    """Filename (no extension) of the running exe/script -- used to give
+    each differently-named exe its own config file automatically, so
+    multiple environments (e.g. a cellpose-sam build and a plain-cellpose
+    build) can share the same PROGRAMDATA folder without colliding."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).stem
+    return Path(__file__).stem
+
+
 def get_config_dir():
     env_override = os.environ.get("CELLPOSE_WRAPPER_CONFIG_DIR")
     if env_override:
@@ -188,12 +211,13 @@ def get_config_dir():
 def load_config():
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
-    config_path = config_dir / "wrapper_config.json"
+    config_path = config_dir / f"{get_exe_stem()}.config.json"
     if not config_path.exists():
         config_path.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
-        print(f"[wrapper] No config found for this workstation -- wrote "
-              f"a default one to {config_path}. Edit real_python and "
-              f"gpu_ids for THIS machine, then rerun.", file=sys.stderr)
+        print(f"[wrapper] No config found for this exe on this "
+              f"workstation -- wrote a default one to {config_path}. "
+              f"Edit real_python and gpu_ids for THIS environment, then "
+              f"rerun.", file=sys.stderr)
         sys.exit(1)
     with open(config_path) as f:
         cfg = json.load(f)

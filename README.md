@@ -1,8 +1,8 @@
-# Multi-GPU Cellpose/SAM Wrapper
+# Multi-GPU Cellpose-SAM Wrapper
 
 A drop-in replacement for the python executable that QuPath's [BIOP Cellpose
 extension](https://github.com/BIOP/qupath-extension-cellpose) calls, which
-fans tile-based Cellpose/SAM inference out across multiple GPUs (or multiple
+fans tile-based Cellpose-SAM inference out across multiple GPUs (or multiple
 concurrent processes on a single GPU, or across CPU cores with no GPU at
 all). Also usable completely standalone, outside QuPath, on any folder of
 images.
@@ -10,7 +10,7 @@ images.
 ## Why this exists
 
 QuPath's StarDist extension runs natively inside QuPath's own JVM, so it can
-multi-thread tile inference in-process. Cellpose/SAM doesn't run natively —
+multi-thread tile inference in-process. Cellpose-SAM doesn't run natively —
 the extension exports annotation tiles to a temp folder and shells out to a
 single external `python -m cellpose --dir <folder> ...` call, which loads the
 model once and then processes every tile in that folder **sequentially**.
@@ -49,7 +49,7 @@ nothing changed except it's faster.
 
 ## Requirements
 
-- A working Cellpose/SAM environment — this wrapper calls into
+- A working Cellpose-SAM (`cpsam`) environment — this wrapper calls into
   your existing install, it doesn't bundle one.
 - Windows (paths and the PyInstaller build step below assume this; the
   config-location fallback logic works on Linux/macOS too, but hasn't been
@@ -65,19 +65,37 @@ nothing changed except it's faster.
    extension version constructs something meaningfully different, the
    argument handling in step 2 below may need adjusting.
 
-2. **Build the executable(s)** (see [Building the .exe](#building-the-exe) —
+2. **Build the executable** (see [Building the .exe](#building-the-exe) —
    most Cellpose preference fields want an actual `.exe`, not a bare `.py`).
 
 3. **Locate the preference field.** In recent versions this has been a
-   single field named something like *"Cellpose-SAM python.exe location"/*"Cellpose python.exe location"**
+   single field named something like *"Cellpose-SAM python.exe location"*
    rather than a separate venv/conda environment picker. Point it at the
    built `.exe`.
 
 4. **First run generates a config.** Run one detection. With no config yet
-   present for this machine, the wrapper writes a default one and the
-   detection will fail with a message in the log telling you where it wrote
-   it and to edit it. See [Configuration](#configuration) for what to put
-   there, then rerun.
+   present for this exe on this machine, the wrapper writes a default one
+   and the detection will fail with a message in the log telling you where
+   it wrote it and to edit it. See [Configuration](#configuration) for what
+   to put there, then rerun.
+
+### Multiple cellpose environments (e.g. cellpose-sam and plain cellpose)
+
+If you need two separate environments — say a `cpsam` environment for one
+QuPath detector and a classic-cellpose environment for another — build two
+differently-**named** exes from this same, unmodified source, e.g.:
+
+```bat
+python -m pyinstaller --onefile --name cellpose_wrapper_sam multi_gpu_cellpose_wrapper.py
+python -m pyinstaller --onefile --name cellpose_wrapper_classic multi_gpu_cellpose_wrapper.py
+```
+
+Each exe automatically reads/writes its **own** config file, named after
+itself (`cellpose_wrapper_sam.config.json` /
+`cellpose_wrapper_classic.config.json`), in the same `%PROGRAMDATA%`
+folder — no collisions, no manual renaming of a shared config file, and no
+source edits between builds. Point each exe at whichever QuPath preference
+field (or Groovy script) needs that specific environment.
 
 ### Sharing one copy of the .exe across multiple workstations
 
@@ -88,7 +106,7 @@ That works because the config file does **not** live next to the `.exe`;
 it lives at a fixed per-machine location:
 
 ```
-%PROGRAMDATA%\CellposeWrapper\wrapper_config.json
+%PROGRAMDATA%\CellposeWrapper\<exe-name>.config.json
 ```
 
 `PROGRAMDATA` is used deliberately instead of `LOCALAPPDATA`: it's tied to
@@ -133,11 +151,14 @@ the same folder repeatedly.
 
 ## Configuration
 
-The wrapper reads `wrapper_config.json` from the per-machine location
-described above (see `wrapper_config.example.json` in this repo for a
-template — copy it there and edit it, don't just rename it in place, since
-the real file's path and contents are machine-specific and intentionally
-excluded from version control).
+The wrapper reads `<exe-name>.config.json` — the filename is derived
+automatically from the exe's own name (see [Multiple cellpose
+environments](#multiple-cellpose-environments-eg-cellpose-sam-and-plain-cellpose)
+above) — from the per-machine location described above. See
+`wrapper_config.example.json` in this repo for a template: copy it to the
+right per-machine path under the matching `<exe-name>.config.json` name and
+edit it there; the real file's path and contents are machine-specific and
+intentionally excluded from version control.
 
 | Key | Meaning |
 |---|---|
@@ -155,7 +176,7 @@ watch `nvidia-smi`:
 
 - **GPU-Util%** climbing higher than a single process gave you → real gain.
 - **Memory used** approaching the card's limit → back off. Each additional
-  worker on the same GPU loads its own complete copy of the Cellpose/SAM
+  worker on the same GPU loads its own complete copy of the Cellpose-SAM
   model (a notably large network compared to earlier cellpose versions),
   so headroom disappears faster than you might expect. Going too high
   causes a worker to hit CUDA out-of-memory, which fails that worker's
@@ -212,6 +233,17 @@ This produces `dist\multi_gpu_cellpose_wrapper.exe`. Test it standalone
 against a folder of a few dummy tiles before pointing QuPath at it — confirm
 the `[wrapper] ...` diagnostic lines look sane and masks actually appear
 back in the folder.
+
+## Migrating from an older build
+
+Earlier versions of this wrapper used a fixed config filename
+(`wrapper_config.json`) regardless of the exe's own name. If you already
+have workstations set up that way, the new per-exe naming means the
+wrapper won't find that old file on the next run — it'll write a fresh
+default instead, and you'll need to re-enter that workstation's
+`real_python` / `gpu_ids` values once into the newly-named file. Worth
+copying the values out of the old file before it's forgotten about, rather
+than re-discovering them from scratch.
 
 ## Known issues / things to watch for
 
