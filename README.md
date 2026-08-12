@@ -269,4 +269,4 @@ than re-discovering them from scratch.
 
 ## License
 
-MIT — see below, or replace with whatever your institution/lab prefers.
+MIT
