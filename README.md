@@ -10,11 +10,11 @@ images.
 ## Why this exists
 
 QuPath's StarDist extension runs natively inside QuPath's own JVM, so it can
-multi-thread tile inference in-process. Cellpose/SAM doesn't run natively —
-the extension exports annotation tiles to a temp folder and shells out to a
-single external `python -m cellpose --dir <folder> ...` call, which loads the
-model once and then processes every tile in that folder **sequentially**.
-On a machine with more than one GPU, that leaves the rest of them idle.
+multi-thread tile inference in-process. Cellpose-SAM doesn't run natively — the extension exports annotation tiles
+to a temp folder and shells out to a single external
+`python -m cellpose --dir <folder> ...` call, which loads the model once
+and then processes every tile in that folder **sequentially**, often
+leaving much of the GPU/CPU resources idle.
 
 This script sits in between: it intercepts that one call, splits the tiles
 across N real cellpose processes (one or more per physical GPU, or across
