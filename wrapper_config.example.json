@@ -1,0 +1,7 @@
+{
+  "real_python": "C:\\path\\to\\your\\real\\cellpose\\env\\python.exe",
+  "gpu_ids": [0, 1, 2, 3],
+  "workers_per_gpu": 1,
+  "copy_instead_of_symlink": true,
+  "limit_threads_per_worker": true
+}
